@@ -1,7 +1,11 @@
 const dotenv = require('dotenv').config(); // Get variables from .env
 const https = require('https'); // Require built-in HTTPS Node module
+const fs = require('fs'); // Require writeFileSync to create calendar files
+const ics = require('ics') // Require ics to create ics calendar files
 const jsdom = require("jsdom"); // Require jsdom for dom parsing
 const { JSDOM } = jsdom;
+const luxon = require('luxon') // Require Luxon to parse and format dates
+const DateTime = luxon.DateTime;
 
 // Get HTML from schedule page
 https.get(process.env.GYM_SCHEDULE_PAGE, (res) => {
@@ -18,29 +22,63 @@ https.get(process.env.GYM_SCHEDULE_PAGE, (res) => {
     // Parse the HTML string
     const { document } = (new JSDOM(data)).window;
 
+    // Get selected schedule's name to later parse the schedule's start and end dates.
+    const scheduleName = document.querySelector('.schedule-selector option[selected]').textContent; // NOTE: The date range only appears on the page in this select filter
+
     // Get elements containing info for each day of the week
     const dayElements = document.querySelectorAll('#Weekly-Schedule-View>ul>li'); // NOTE: dayElements don't have any classes or IDs to target
 
-    // Create new array, weekSchedule, containing key info
-    const weekSchedule = [...dayElements].map((dayElement) => {
+    // Create an array of a week of events formatted for input into ics
+    const startEndDates = scheduleName.match(/((\d){2}\/){2}(\d){4}/g).map((date) => {
+      return DateTime.fromFormat(date, 'dd/LL/yyyy');
+    });
+    const startDayOfWeek = startEndDates[0].weekday;
+
+    const events = [...dayElements].reduce((acc, dayElement) => {
       // Get elements containing class info
       const classElements = dayElement.querySelectorAll('ul li'); // NOTE: classElements don't have any classes or IDs to target
 
       // Create key info
-      const dayOfWeek = dayElement.querySelector('h4').textContent;
+      const dayOfWeek = DateTime.fromFormat(dayElement.querySelector('h4').textContent, 'cccc').weekday;
+      const dayOffset = dayOfWeek - startDayOfWeek + (dayOfWeek >= startDayOfWeek ? 0 : 7);
+      const date = startEndDates[0].plus({days: dayOffset});
       const classes = [...classElements].map((classElement) => {
-        const name = classElement.querySelector('.class-name').textContent.trim();
-        const time = classElement.querySelector('.time').textContent.trim();
-        const room = classElement.querySelector('.room').textContent.trim();
-        const link = classElement.querySelector('a').href;
 
-        return {name,time,room,link};
+        // Get class info from HTML
+        const name = classElement.querySelector('.class-name').textContent.trim();
+        const times = classElement.querySelector('.time').textContent.trim().split(' - ').map((time) => {
+          return DateTime.fromFormat(time, 'h:mma');
+        });
+        const room = classElement.querySelector('.room').textContent.trim();
+        const url = classElement.querySelector('a').href;
+        console.log(url);
+
+        // Calculate start and end and repeat
+        const start = [date.year, date.month, date.day, times[0].hour, times[0].minute];
+        const end = [date.year, date.month, date.day, times[1].hour, times[1].minute];
+        const repeat = 0;
+
+        return {
+          title: name,
+          location: room,
+          description: url,
+          start,
+          end,
+          repeat,
+        };
       });
 
-      return {dayOfWeek,classes};
-    });
+      return acc.concat(classes);
+    }, []);
 
-    console.log(weekSchedule);
+    // Create ics calendar file
+    ics.createEvents(events, (error, value) => {
+      if (error) {
+        console.log(error)
+      }
+
+      fs.writeFileSync(`${__dirname}/output/calendar.ics`, value)
+    });
 
   });
 
