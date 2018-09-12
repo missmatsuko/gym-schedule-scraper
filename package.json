@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "description": "Scrapes the schedule page on my gym's website so I can import it into my Google Calendar.",
   "main": "index.js",
-  "dependencies": {},
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "dotenv": "^6.0.0"
+  },
   "devDependencies": {},
   "author": "Matsuko Friedland <info@matsuko.ca> (http://www.matsuko.ca)",
   "license": "UNLICENSED"
