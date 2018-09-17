@@ -1,7 +1,7 @@
 {
   "name": "gym-schedule-scraper",
   "version": "1.0.0",
-  "description": "Scrapes the schedule page on my gym's website so I can import it into my Google Calendar.",
+  "description": "Scrapes a schedule page on my gym's website so I can import it into my Google Calendar.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
