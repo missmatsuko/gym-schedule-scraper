@@ -1,11 +1,13 @@
+// Modules
 const dotenv = require('dotenv').config(); // Get variables from .env
 const https = require('https'); // Require built-in HTTPS Node module
 const fs = require('fs'); // Require writeFileSync to create calendar files
 const ics = require('ics') // Require ics to create ics calendar files
 const jsdom = require("jsdom"); // Require jsdom for dom parsing
 const { JSDOM } = jsdom;
-const luxon = require('luxon') // Require Luxon to parse and format dates
+const luxon = require('luxon'); // Require Luxon to parse and format dates
 const DateTime = luxon.DateTime;
+const RRule = require('rrule').RRule;
 
 // Get HTML from schedule page
 https.get(process.env.GYM_SCHEDULE_PAGE, (res) => {
@@ -32,7 +34,15 @@ https.get(process.env.GYM_SCHEDULE_PAGE, (res) => {
     const startEndDates = scheduleName.match(/((\d){2}\/){2}(\d){4}/g).map((date) => {
       return DateTime.fromFormat(date, 'dd/LL/yyyy');
     });
-    const startDayOfWeek = startEndDates[0].weekday;
+    const startDate = startEndDates[0];
+    const endDate = startEndDates[1].endOf('day');
+    const startDayOfWeek = startDate.weekday;
+
+    // Create RRULE
+    const rrule = new RRule({
+      freq: RRule.WEEKLY,
+      until: endDate,
+    }).toString();
 
     const events = [...dayElements].reduce((acc, dayElement) => {
       // Get elements containing class info
@@ -41,7 +51,7 @@ https.get(process.env.GYM_SCHEDULE_PAGE, (res) => {
       // Create key info
       const dayOfWeek = DateTime.fromFormat(dayElement.querySelector('h4').textContent, 'cccc').weekday;
       const dayOffset = dayOfWeek - startDayOfWeek + (dayOfWeek >= startDayOfWeek ? 0 : 7);
-      const date = startEndDates[0].plus({days: dayOffset});
+      const date = startDate.plus({days: dayOffset});
       const classes = [...classElements].map((classElement) => {
 
         // Get class info from HTML
@@ -51,12 +61,10 @@ https.get(process.env.GYM_SCHEDULE_PAGE, (res) => {
         });
         const room = classElement.querySelector('.room').textContent.trim();
         const url = classElement.querySelector('a').href;
-        console.log(url);
 
-        // Calculate start and end and repeat
+        // Calculate start and end
         const start = [date.year, date.month, date.day, times[0].hour, times[0].minute];
         const end = [date.year, date.month, date.day, times[1].hour, times[1].minute];
-        const repeat = 0;
 
         return {
           title: name,
@@ -64,7 +72,6 @@ https.get(process.env.GYM_SCHEDULE_PAGE, (res) => {
           description: url,
           start,
           end,
-          repeat,
         };
       });
 
@@ -77,7 +84,10 @@ https.get(process.env.GYM_SCHEDULE_PAGE, (res) => {
         console.log(error)
       }
 
-      fs.writeFileSync(`${__dirname}/output/calendar.ics`, value)
+      // Add RRULE to each event
+      value = value.replace(/^END:VEVENT$/gm, `${rrule}\nEND:VEVENT`);
+
+      fs.writeFileSync(`${__dirname}/output/calendar.ics`, value);
     });
 
   });
