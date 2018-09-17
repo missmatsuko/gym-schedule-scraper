@@ -4,9 +4,9 @@ const fs = require('fs'); // To create files
 const https = require('https'); // To make https request
 
 // NPM Modules
-const dotenv = require('dotenv').config(); // To get variables from .env
+require('dotenv').config(); // To get variables from .env
 const ics = require('ics') // To ics-formatted data
-const jsdom = require("jsdom"); // To parse as HTML like a DOM
+const jsdom = require('jsdom'); // To parse as HTML like a DOM
 const { JSDOM } = jsdom;
 const luxon = require('luxon'); // To parse and format dates
 const DateTime = luxon.DateTime;
