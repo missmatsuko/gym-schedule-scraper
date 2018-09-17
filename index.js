@@ -2,6 +2,7 @@
 const assert = require('assert'); // To add assertion tests
 const fs = require('fs'); // To create files
 const https = require('https'); // To make https request
+const url = require('url'); // To parse URL
 
 // NPM Modules
 require('dotenv').config(); // To get variables from .env
@@ -14,9 +15,10 @@ const RRule = require('rrule').RRule; // To create RRULE-formatted string
 
 // Variables
 const numberOfDaysInAWeek = 7;
+const scheduleURL = new URL(process.env.GYM_SCHEDULE_PAGE);
 
 // Make https request to the schedule page
-https.get(process.env.GYM_SCHEDULE_PAGE, (res) => {
+https.get(scheduleURL.href, (res) => {
   // Set up empty string to store HTML
   let data = '';
 
@@ -78,7 +80,7 @@ https.get(process.env.GYM_SCHEDULE_PAGE, (res) => {
 
       // Format classes for ics
       const classes = [...classElements].map((classElement) => {
-        // Get info about each class from HTML
+        // Info about each class
         const className = classElement.querySelector('.class-name').textContent.trim();
         assert(className.length);
         const classTimes = classElement.querySelector('.time').textContent.trim().split(' - ').map((classTimeString) => {
@@ -86,18 +88,17 @@ https.get(process.env.GYM_SCHEDULE_PAGE, (res) => {
           assert(classTime.isValid);
           return classTime;
         });
-        assert(classTimes.length === 2);
-        const classRoom = classElement.querySelector('.room').textContent.trim() || '';
-        const classURL = classElement.querySelector('a').href || '';
-
-        // Get start and end times of class
         const classStartTime = classTimes[0];
         const classEndTime = classTimes[1];
+        assert(classTimes.length === 2);
+        const classRoom = classElement.querySelector('.room').textContent.trim() || '';
+        const classHref = `${scheduleURL.origin}${classElement.querySelector('a').href}` || '';
+        const classDescription = `Details: ${classHref !== scheduleURL.origin ? classHref : scheduleURL.href}`;
 
         return {
           title: className,
           location: classRoom,
-          description: classURL,
+          description: classDescription,
           start: [scheduleDate.year, scheduleDate.month, scheduleDate.day, classStartTime.hour, classStartTime.minute],
           end: [scheduleDate.year, scheduleDate.month, scheduleDate.day, classEndTime.hour, classEndTime.minute],
         };
